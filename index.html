@@ -5200,7 +5200,16 @@ function renderClosingTimeBar(records, monthSelectId, outcomeSelectId, barContai
       leg1Seen.add(key);
       return true;
     });
-  const leg2Recs = cohort.map(r => ({ n: r.n, from: r.call1, to: r.d, days: daysBetweenDates(r.call1, r.d) })).filter(x => x.days !== null && x.days >= 0);
+  // Leg 2 (Call 1 -> Proposal Created) is also lead-level: one Call 1 can produce one or several
+  // proposals, so each unique lead (name + leadCreated + call1) counts once, measured to that lead's
+  // FIRST proposal created date (the earliest one off that Call 1).
+  const leg2ByLead = new Map();
+  cohort.forEach(r => {
+    const key = r.n + '|' + r.leadCreated + '|' + r.call1;
+    const cur = leg2ByLead.get(key);
+    if (!cur || (r.d || '') < (cur.d || '')) leg2ByLead.set(key, r);
+  });
+  const leg2Recs = [...leg2ByLead.values()].map(r => ({ n: r.n, from: r.call1, to: r.d, days: daysBetweenDates(r.call1, r.d) })).filter(x => x.days !== null && x.days >= 0);
   const leg3Recs = cohort.map(r => ({ n: r.n, from: r.d, to: r.sent, days: daysBetweenDates(r.d, r.sent) })).filter(x => x.days !== null && x.days >= 0);
   const leg1Days = leg1Recs.map(x => x.days);
   const leg2Days = leg2Recs.map(x => x.days);
@@ -5262,7 +5271,7 @@ function renderClosingTimeBar(records, monthSelectId, outcomeSelectId, barContai
   const arrow = `<div class="closing-time-arrow">&rarr;</div>`;
   el.innerHTML = `<div class="closing-time-cards">` +
     card('Lead Created to Call 1', avg1, leg1Days.length, 'var(--blue-deep)', leg1Recs, 'lead', leg1FilterHtml, leg1Suffix) + arrow +
-    card('Call 1 to Proposal Created', avg2, leg2Days.length, 'var(--blue)', leg2Recs) + arrow +
+    card('Call 1 to Proposal Created', avg2, leg2Days.length, 'var(--blue)', leg2Recs, 'lead') + arrow +
     card('Proposal Created to Proposal Sent', avg3, leg3Days.length, 'var(--blue)', leg3Recs) + arrow +
     card(leg4Label, avg4, leg4Days.length, 'var(--green-deep)', leg4Recs) +
     `</div>`;
