@@ -5209,7 +5209,12 @@ function renderClosingTimeBar(records, monthSelectId, outcomeSelectId, barContai
     const cur = leg2ByLead.get(key);
     if (!cur || (r.d || '') < (cur.d || '')) leg2ByLead.set(key, r);
   });
-  const leg2Recs = [...leg2ByLead.values()].map(r => ({ n: r.n, from: r.call1, to: r.d, days: daysBetweenDates(r.call1, r.d) })).filter(x => x.days !== null && x.days >= 0);
+  const leg2Recs = [...leg2ByLead.entries()].map(([k, r]) => ({ k, n: r.n, from: r.call1, to: r.d, days: daysBetweenDates(r.call1, r.d) })).filter(x => x.days !== null && x.days >= 0);
+  const leg2Keys = new Set(leg2Recs.map(x => x.k));
+  const leg2ProposalCount = cohort.filter(r => leg2Keys.has(r.n + '|' + r.leadCreated + '|' + r.call1)).length;
+  const leg1SysCount = leg1Recs.filter(x => getBookedVia(x.n) === 'System').length;
+  const leg1RepCount = leg1Recs.filter(x => getBookedVia(x.n) === 'Rep').length;
+  const leg1UnkCount = leg1Recs.length - leg1SysCount - leg1RepCount;
   const leg3Recs = cohort.map(r => ({ n: r.n, from: r.d, to: r.sent, days: daysBetweenDates(r.d, r.sent) })).filter(x => x.days !== null && x.days >= 0);
   const leg1Days = leg1Recs.map(x => x.days);
   const leg2Days = leg2Recs.map(x => x.days);
@@ -5223,6 +5228,8 @@ function renderClosingTimeBar(records, monthSelectId, outcomeSelectId, barContai
     .map(r => ({ n: r.n, from: r.sent, to: r.stage === 'Closed Won' ? r.signed : r.lost, days: daysBetweenDates(r.sent, r.stage === 'Closed Won' ? r.signed : r.lost) }))
     .filter(x => x.days !== null && x.days >= 0);
   const leg4Days = leg4Recs.map(x => x.days);
+  const leg4WonCount = leg4Pool.filter(r => r.stage === 'Closed Won' && r.signed && daysBetweenDates(r.sent, r.signed) !== null && daysBetweenDates(r.sent, r.signed) >= 0).length;
+  const leg4LostCount = leg4Days.length - leg4WonCount;
 
   const avg1 = avgOf(leg1Days), avg2 = avgOf(leg2Days), avg3 = avgOf(leg3Days), avg4 = avgOf(leg4Days);
   const el = document.getElementById(barContainerId);
@@ -5258,22 +5265,22 @@ function renderClosingTimeBar(records, monthSelectId, outcomeSelectId, barContai
         <option value="System"${leg1BookedViaFilter === 'System' ? ' selected' : ''}>In System</option>
         <option value="Rep"${leg1BookedViaFilter === 'Rep' ? ' selected' : ''}>Sales Rep</option>
       </select>` : '';
-  const card = (label, avg, n, color, recs, unit, filterHtml, cardSuffix) => `
+  const card = (label, avg, n, color, recs, unit, filterHtml, cardSuffix, subText) => `
     <div class="closing-time-card" style="--accent:${color};">
       <div class="ctc-head">${label}</div>
       ${filterHtml || ''}
       <div class="ctc-body">
         <div class="ctc-num">${avg !== null ? avg.toFixed(0) : '&mdash;'}${avg !== null ? '<span class="unit">days</span>' : ''}</div>
-        <div class="ctc-sub">${n} ${unit || 'proposal'}${n === 1 ? '' : 's'}${cardSuffix !== undefined ? cardSuffix : suffix}</div>
+        <div class="ctc-sub">${subText !== undefined ? subText : (n + ' ' + (unit || 'proposal') + (n === 1 ? '' : 's'))}${cardSuffix !== undefined ? cardSuffix : suffix}</div>
       </div>
       <details class="ctc-calc"><summary>Show calculation</summary>${calcBreakdown(recs)}</details>
     </div>`;
   const arrow = `<div class="closing-time-arrow">&rarr;</div>`;
   el.innerHTML = `<div class="closing-time-cards">` +
-    card('Lead Created to Call 1', avg1, leg1Days.length, 'var(--blue-deep)', leg1Recs, 'lead', leg1FilterHtml, leg1Suffix) + arrow +
-    card('Call 1 to Proposal Created', avg2, leg2Days.length, 'var(--blue)', leg2Recs, 'lead') + arrow +
-    card('Proposal Created to Proposal Sent', avg3, leg3Days.length, 'var(--blue)', leg3Recs) + arrow +
-    card(leg4Label, avg4, leg4Days.length, 'var(--green-deep)', leg4Recs) +
+    card('Lead Created to Call 1', avg1, leg1Days.length, 'var(--blue-deep)', leg1Recs, 'lead', leg1FilterHtml, leg1Suffix, `${leg1Days.length} Lead${leg1Days.length === 1 ? '' : 's'} (${leg1SysCount} in system - ${leg1RepCount} sales rep${leg1UnkCount ? ' - ' + leg1UnkCount + ' unknown' : ''})`) + arrow +
+    card('Call 1 to Proposal Created', avg2, leg2Days.length, 'var(--blue)', leg2Recs, 'lead', '', undefined, `${leg2Days.length} Lead${leg2Days.length === 1 ? '' : 's'} to ${leg2ProposalCount} Proposal${leg2ProposalCount === 1 ? '' : 's'}`) + arrow +
+    card('Proposal Created to Proposal Sent', avg3, leg3Days.length, 'var(--blue)', leg3Recs, 'proposal', '', undefined, `${leg3Days.length} Proposal${leg3Days.length === 1 ? '' : 's'}`) + arrow +
+    card(leg4Label, avg4, leg4Days.length, 'var(--green-deep)', leg4Recs, 'proposal', '', undefined, `${leg4Days.length} Proposal${leg4Days.length === 1 ? '' : 's'} (${leg4WonCount} won - ${leg4LostCount} lost)`) +
     `</div>`;
 }
 function renderHist2026ClosingTimeBar() { renderClosingTimeBar(hist2026ProposalRecords, 'hist2026ClosingTimeMonth', 'hist2026ClosingTimeOutcome', 'hist2026ClosingTimeBar', 'hist2026Leg1BookedVia', 'renderHist2026ClosingTimeBar()'); }
