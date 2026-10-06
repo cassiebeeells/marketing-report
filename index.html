@@ -7510,7 +7510,7 @@ function refreshDynamicCopy() {
     set('ctotmatch', 'is identical, to the penny, to');
   } else {
     set('ctotmatch', 'currently differs by ' + Math.abs(lcDiff) + ' proposal' + (Math.abs(lcDiff) === 1 ? '' : 's') + ' from');
-    set('ctotwhy', 'because ' + Math.abs(lcDiff) + ' proposal' + (Math.abs(lcDiff) === 1 ? '' : 's') + ' in Proposals by Month belong to Zoho clients with no matching lead record in the lead list, so Lead Conversion can&rsquo;t attribute ' + (Math.abs(lcDiff) === 1 ? 'it' : 'them'));
+    set('ctotwhy', 'because ' + Math.abs(lcDiff) + ' proposal' + (Math.abs(lcDiff) === 1 ? '' : 's') + ' in Proposals by Month ' + (Math.abs(lcDiff) === 1 ? 'isn&rsquo;t' : 'aren&rsquo;t') + ' tied to a tracked lead (previously reviewed), so Lead Conversion doesn&rsquo;t count ' + (Math.abs(lcDiff) === 1 ? 'it' : 'them'));
   }
   set('leadsTotal', n0(allLeads.length));
   set('leadsRange', ymRange(allLeads.map(l => l.d)));
