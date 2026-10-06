@@ -7184,14 +7184,22 @@ function computeMarketingGlanceCumulative(rangeStart, rangeEnd) {
   // detail once the user picks a custom range that doesn't match any preset.
   const useMonthly = Object.values(GLANCE_YEAR_PRESETS).some(([s, e]) => s === start && e === end);
   const dates = useMonthly ? buildGlanceMonthlyDates(start, end) : buildGlanceWeeklyDates(start, end);
-  const points = dates.map(d => d.toISOString().slice(0, 10));
+  const points = dates.map(d => d.getFullYear() + '-' + String(d.getMonth() + 1).padStart(2, '0') + '-' + String(d.getDate()).padStart(2, '0'));
   const labels = useMonthly
     ? dates.map(d => d.toLocaleDateString('en-US', { month: 'short', year: 'numeric' }))
     : dates.map(d => d.toLocaleDateString('en-US', { month: 'numeric', day: 'numeric', year: 'numeric' }));
-  const spend = points.map(p => cumulativeAdSpendAsOf(p));
-  const pending = points.map(p => cumulativeProposalAmountAsOf(p, 'Awaiting Acceptance'));
-  const won = points.map(p => cumulativeProposalAmountAsOf(p, 'Closed Won'));
-  const lost = points.map(p => cumulativeProposalAmountAsOf(p, 'Closed Lost'));
+  // Running totals restart at the selected range's first day: subtract everything accumulated up to
+  // the day BEFORE the range starts (so Year = 2026 begins from $0 on Jan 1, 2026, not from the Apr
+  // 2025 totals). Ranges starting on/before Apr 30, 2025 (the first day of history) need no baseline.
+  const baseDate = (() => { const b = new Date(start + "T00:00:00Z"); b.setUTCDate(b.getUTCDate() - 1); return b.toISOString().slice(0, 10); })();
+  const hasBase = start > "2025-04-30";
+  const spendBase = hasBase ? cumulativeAdSpendAsOf(baseDate) : 0;
+  const stageBase = st => hasBase ? cumulativeProposalAmountAsOf(baseDate, st) : 0;
+  const pendBase = stageBase('Awaiting Acceptance'), wonBase = stageBase('Closed Won'), lostBase = stageBase('Closed Lost');
+  const spend = points.map(p => cumulativeAdSpendAsOf(p) - spendBase);
+  const pending = points.map(p => cumulativeProposalAmountAsOf(p, 'Awaiting Acceptance') - pendBase);
+  const won = points.map(p => cumulativeProposalAmountAsOf(p, 'Closed Won') - wonBase);
+  const lost = points.map(p => cumulativeProposalAmountAsOf(p, 'Closed Lost') - lostBase);
   return { dates: points, labels, spend, pending, won, lost, useMonthly };
 }
 function onGlanceRangeChange() {
