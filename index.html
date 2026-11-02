@@ -1106,6 +1106,7 @@
           <div class="date-mode-toggle">
             <label><input type="radio" name="call2DateMode" value="month" checked onchange="onCall2DateModeChange('month')"> By Month</label>
             <label><input type="radio" name="call2DateMode" value="custom" onchange="onCall2DateModeChange('custom')"> Custom Range</label>
+            <label><input type="radio" name="call2DateMode" value="compare" onchange="onCall2DateModeChange('compare')"> Compare Ranges</label>
           </div>
           <div id="call2DateMonthControls">
             <div class="multi-select-panel" id="call2DateMonthPanel" style="position:static;border:none;box-shadow:none;padding:0;min-width:0;max-height:200px;overflow-y:auto;"></div>
@@ -1114,6 +1115,22 @@
             <label class="date-range-label">From<input type="date" id="call2DateCustomStart" onchange="onCall2DateFilterChange()"></label>
             <label class="date-range-label">To<input type="date" id="call2DateCustomEnd" onchange="onCall2DateFilterChange()"></label>
             <p class="h3-note" style="margin:4px 0 0;">Snaps to whole months, matching the table above.</p>
+          </div>
+          <div id="call2DateCompareControls" style="display:none;padding:0 7px;">
+            <div style="display:flex;flex-direction:column;gap:6px;">
+              <strong style="font-size:12px;">Range A</strong>
+              <label class="date-range-label">From<input type="date" id="cmpAStart" onchange="renderCall2RangeCompare()"></label>
+              <label class="date-range-label">To<input type="date" id="cmpAEnd" onchange="renderCall2RangeCompare()"></label>
+              <strong style="font-size:12px;">Range B</strong>
+              <label class="date-range-label">From<input type="date" id="cmpBStart" onchange="renderCall2RangeCompare()"></label>
+              <label class="date-range-label">To<input type="date" id="cmpBEnd" onchange="renderCall2RangeCompare()"></label>
+              <div style="display:flex;flex-direction:column;gap:4px;margin-top:4px;">
+                <button type="button" class="period-reset-btn" onclick="setCall2ComparePreset('week')">Last 7 days vs prior 7</button>
+                <button type="button" class="period-reset-btn" onclick="setCall2ComparePreset('14')">Last 14 vs prior 14</button>
+                <button type="button" class="period-reset-btn" onclick="setCall2ComparePreset('30')">Last 30 vs prior 30</button>
+                <button type="button" class="period-reset-btn" onclick="setCall2ComparePreset('month')">This month vs last month</button>
+              </div>
+            </div>
           </div>
           <button type="button" class="multi-select-clear" onclick="clearCall2DateFilter()">Clear (All Dates)</button>
         </div>
@@ -1176,22 +1193,9 @@
         </table>
       </div>
     </div>
-    <div id="call2RangeCompareWrap" style="margin-top:26px;">
+    <div id="call2RangeCompareWrap" style="margin-top:26px;display:none;">
       <h3 style="margin-top:0;">Compare Date Ranges <span style="font-weight:400;color:var(--muted);font-size:11px;" id="call2RangeCompareSub"></span></h3>
-      <details class="note-expand desc-expand"><summary>Show note</summary><p class="h3-note">Pick two exact date ranges (to the day) and see them side by side with the change between them. Leads are counted by the date they were created, and Sales Rep, Call 1 Booked, Call 1 Status, Booking Source and Proposal Status filters above apply to both ranges; the Date filter above and the Report Period are ignored here. Meetings, attendance and proposals are for the leads created in each range, so recent ranges can still grow as leads book and proposals come in.</p></details>
-      <div class="rep-detail-filters" style="padding:0 0 10px;">
-        <label class="date-range-label">Range A: From<input type="date" id="cmpAStart" onchange="renderCall2RangeCompare()"></label>
-        <label class="date-range-label">To<input type="date" id="cmpAEnd" onchange="renderCall2RangeCompare()"></label>
-        <span style="margin:0 10px;color:var(--muted);">vs</span>
-        <label class="date-range-label">Range B: From<input type="date" id="cmpBStart" onchange="renderCall2RangeCompare()"></label>
-        <label class="date-range-label">To<input type="date" id="cmpBEnd" onchange="renderCall2RangeCompare()"></label>
-      </div>
-      <div class="rep-detail-filters" style="padding:0 0 14px;">
-        <button type="button" class="period-reset-btn" onclick="setCall2ComparePreset('week')">Last 7 days vs prior 7</button>
-        <button type="button" class="period-reset-btn" onclick="setCall2ComparePreset('14')">Last 14 vs prior 14</button>
-        <button type="button" class="period-reset-btn" onclick="setCall2ComparePreset('30')">Last 30 vs prior 30</button>
-        <button type="button" class="period-reset-btn" onclick="setCall2ComparePreset('month')">This month vs last month</button>
-      </div>
+      <details class="note-expand desc-expand"><summary>Show note</summary><p class="h3-note">Set the two ranges under Date &rarr; Compare Ranges. Leads are counted by the day they were created, and the Sales Rep, Call 1, Booking Source and Proposal Status filters apply to both ranges. Meetings and proposals are for the leads created in each range, so recent ranges can still grow.</p></details>
       <div class="table-scroll"><div id="call2RangeCompareOut"></div></div>
     </div>
   </div>
@@ -3790,8 +3794,10 @@ function onCall2DateModeChange(mode) {
   call2DateFilter.mode = mode;
   document.getElementById("call2DateMonthControls").style.display = mode === "month" ? "block" : "none";
   document.getElementById("call2DateCustomControls").style.display = mode === "custom" ? "block" : "none";
+  document.getElementById("call2DateCompareControls").style.display = mode === "compare" ? "block" : "none";
   updateCall2DateToggleLabel();
   renderCall2Table();
+  renderCall2RangeCompare();
 }
 function onCall2DateFilterChange() {
   const startEl = document.getElementById("call2DateCustomStart");
@@ -3812,9 +3818,11 @@ function clearCall2DateFilter() {
   if (endEl) endEl.value = '';
   updateCall2DateToggleLabel();
   renderCall2Table();
+  renderCall2RangeCompare();
 }
 function updateCall2DateToggleLabel() {
   const btn = document.getElementById("call2DateMultiSelectToggle");
+  if (call2DateFilter.mode === "compare") { btn.textContent = "Compare Ranges"; btn.classList.add("has-selection"); return; }
   const q = getCall2DateQualifyingMonths();
   if (!q) { btn.textContent = "Date"; btn.classList.remove("has-selection"); return; }
   if (call2DateFilter.mode === "month") {
@@ -3843,6 +3851,7 @@ function monthLabelsBetween(startStr, endStr) {
 // month labels - "By Month" mode can now check off multiple months directly, "Custom Range" mode
 // expands the chosen start/end dates out to every month they touch.
 function getCall2DateQualifyingMonths() {
+  if (call2DateFilter.mode === "compare") return null;
   if (call2DateFilter.mode === "month") {
     return call2DateFilter.months.length ? new Set(call2DateFilter.months) : null;
   }
@@ -6456,6 +6465,10 @@ function setCall2ComparePreset(kind) {
 function renderCall2RangeCompare() {
   const out = document.getElementById('call2RangeCompareOut');
   if (!out) return;
+  const wrap = document.getElementById('call2RangeCompareWrap');
+  const on = call2DateFilter.mode === 'compare';
+  if (wrap) wrap.style.display = on ? 'block' : 'none';
+  if (!on) return;
   const v = id => document.getElementById(id).value;
   const aS = v('cmpAStart'), aE = v('cmpAEnd'), bS = v('cmpBStart'), bE = v('cmpBEnd');
   if (!aS || !aE || !bS || !bE) { out.innerHTML = '<p class="h3-note">Pick a start and end date for both ranges, or use a quick comparison above.</p>'; return; }
