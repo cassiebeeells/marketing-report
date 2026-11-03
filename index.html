@@ -983,10 +983,12 @@
   .cmpv-badge.down { background:#f6d9d6; color:#8a2a21; }
   .cmpv-badge.flat { background: var(--line); color: var(--muted-tint); }
   .cmpv-line { display:flex; align-items:center; gap:8px; margin-top:4px; }
-  .cmpv-track { flex:1; background: var(--card-bg2); border-radius:6px; height:22px; overflow:hidden; }
-  .cmpv-fill { height:100%; border-radius:6px; }
-  .cmpv-fill.a { background: var(--blue-deep); }
-  .cmpv-fill.b { background: var(--blue-tint); }
+  .cmpv-track { background: var(--card-bg2); border-radius:7px; height:30px; overflow:hidden; }
+  .cmpv-fill { height:100%; border-radius:7px; display:flex; align-items:center; justify-content:space-between; gap:14px; padding:0 10px; min-width:max-content; white-space:nowrap; box-sizing:border-box; font-size:12.5px; }
+  .cmpv-fill.a { background: var(--blue-deep); color:#fff; }
+  .cmpv-fill.b { background: var(--blue-tint); color: var(--navy); }
+  .cmpv-lbl { font-weight:500; opacity:.92; }
+  .cmpv-num { font-weight:800; font-size:13.5px; }
   .cmpv-val { min-width:84px; text-align:right; font-size:13px; font-weight:700; color:var(--heading); }
   .cmpv-val.b { font-weight:500; color:var(--muted); }
   .cmpv-swatch { display:inline-block; width:12px; height:12px; border-radius:3px; margin-right:6px; vertical-align:-1px; }
@@ -7739,7 +7741,7 @@ function renderGlanceVisuals() {
   // ---- Side-by-side comparison (replaces the trend charts when a previous period is chosen) ----
   const cmpBox = document.getElementById('glanceCmpVisual'), timeBox = document.getElementById('glanceTimeBlock');
   if (B) {
-    const shortLbl = (p, isPrev) => mode === 'month' ? new Date(p.s + 'T00:00:00Z').toLocaleDateString('en-US', { month: 'long', year: 'numeric', timeZone: 'UTC' }) : glanceFmtD(p.s) + ' \u2013 ' + glanceFmtD(p.e);
+    const shortLbl = (p, isPrev) => mode === 'month' ? new Date(p.s + 'T00:00:00Z').toLocaleDateString('en-US', { month: 'short', year: 'numeric', timeZone: 'UTC' }) : glanceFmtD(p.s) + ' \u2013 ' + glanceFmtD(p.e);
     const lA = shortLbl(P), lB = shortLbl(PV, true);
     document.getElementById('glanceCmpVisLegend').innerHTML = `<span><i class="cmpv-swatch" style="background:var(--blue-deep);height:12px;width:12px;"></i>${lA} (selected)</span><span><i class="cmpv-swatch" style="background:var(--blue-tint);height:12px;width:12px;"></i>${lB} (previous)</span>`;
     const fmtMoney = v => fmtUSD(v), fmtMoney2 = v => v === null ? '\u2014' : fmtUSD2(v), fmtN = v => v.toLocaleString(), fmtP = v => v === null ? '\u2014' : v.toFixed(1) + '%';
@@ -7753,8 +7755,8 @@ function renderGlanceVisuals() {
     const pair = (title, va, vb, f, dir, pts) => {
       const mx = Math.max(va || 0, vb || 0) || 1, w = v => v === null ? 0 : Math.max(v > 0 ? 2 : 0, v / mx * 100);
       return `<div class="cmpv-row"><div class="cmpv-top"><span>${title}</span>${badge(va, vb, dir, pts, f)}</div>` +
-        `<div class="cmpv-line"><div class="cmpv-track"><div class="cmpv-fill a" style="width:${w(va)}%"></div></div><div class="cmpv-val">${va === null ? '\u2014' : f(va)}</div></div>` +
-        `<div class="cmpv-line"><div class="cmpv-track"><div class="cmpv-fill b" style="width:${w(vb)}%"></div></div><div class="cmpv-val b">${vb === null ? '\u2014' : f(vb)}</div></div></div>`;
+        `<div class="cmpv-track"><div class="cmpv-fill a" style="width:${w(va)}%"><span class="cmpv-lbl">${lA}</span><span class="cmpv-num">${va === null ? '\u2014' : f(va)}</span></div></div>` +
+        `<div class="cmpv-track" style="margin-top:4px;"><div class="cmpv-fill b" style="width:${w(vb)}%"><span class="cmpv-lbl">${lB}</span><span class="cmpv-num">${vb === null ? '\u2014' : f(vb)}</span></div></div></div>`;
     };
     document.getElementById('glanceCmpVisMetrics').innerHTML =
       pair('Ad spend', A.spend, B.spend, fmtMoney, 0) + pair('Facebook leads', A.leads, B.leads, fmtN, 1) + pair('Ad spend per lead', A.cpl, B.cpl, fmtMoney2, -1) +
