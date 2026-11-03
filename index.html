@@ -1106,7 +1106,6 @@
           <div class="date-mode-toggle">
             <label><input type="radio" name="call2DateMode" value="month" checked onchange="onCall2DateModeChange('month')"> By Month</label>
             <label><input type="radio" name="call2DateMode" value="custom" onchange="onCall2DateModeChange('custom')"> Custom Range</label>
-            <label><input type="radio" name="call2DateMode" value="compare" onchange="onCall2DateModeChange('compare')"> Compare Ranges</label>
           </div>
           <div id="call2DateMonthControls">
             <div class="multi-select-panel" id="call2DateMonthPanel" style="position:static;border:none;box-shadow:none;padding:0;min-width:0;max-height:200px;overflow-y:auto;"></div>
@@ -1114,23 +1113,7 @@
           <div id="call2DateCustomControls" style="display:none;">
             <label class="date-range-label">From<input type="date" id="call2DateCustomStart" onchange="onCall2DateFilterChange()"></label>
             <label class="date-range-label">To<input type="date" id="call2DateCustomEnd" onchange="onCall2DateFilterChange()"></label>
-            <p class="h3-note" style="margin:4px 0 0;">Snaps to whole months, matching the table above.</p>
-          </div>
-          <div id="call2DateCompareControls" style="display:none;padding:0 7px;">
-            <div style="display:flex;flex-direction:column;gap:6px;">
-              <strong style="font-size:12px;">Range A</strong>
-              <label class="date-range-label">From<input type="date" id="cmpAStart" onchange="renderCall2RangeCompare()"></label>
-              <label class="date-range-label">To<input type="date" id="cmpAEnd" onchange="renderCall2RangeCompare()"></label>
-              <strong style="font-size:12px;">Range B</strong>
-              <label class="date-range-label">From<input type="date" id="cmpBStart" onchange="renderCall2RangeCompare()"></label>
-              <label class="date-range-label">To<input type="date" id="cmpBEnd" onchange="renderCall2RangeCompare()"></label>
-              <div style="display:flex;flex-direction:column;gap:4px;margin-top:4px;">
-                <button type="button" class="period-reset-btn" onclick="setCall2ComparePreset('week')">Last 7 days vs prior 7</button>
-                <button type="button" class="period-reset-btn" onclick="setCall2ComparePreset('14')">Last 14 vs prior 14</button>
-                <button type="button" class="period-reset-btn" onclick="setCall2ComparePreset('30')">Last 30 vs prior 30</button>
-                <button type="button" class="period-reset-btn" onclick="setCall2ComparePreset('month')">This month vs last month</button>
-              </div>
-            </div>
+            <p class="h3-note" style="margin:4px 0 0;">Exact dates, to the day.</p>
           </div>
           <button type="button" class="multi-select-clear" onclick="clearCall2DateFilter()">Clear (All Dates)</button>
         </div>
@@ -1192,11 +1175,6 @@
           <tbody></tbody>
         </table>
       </div>
-    </div>
-    <div id="call2RangeCompareWrap" style="margin-top:26px;display:none;">
-      <h3 style="margin-top:0;">Compare Date Ranges <span style="font-weight:400;color:var(--muted);font-size:11px;" id="call2RangeCompareSub"></span></h3>
-      <details class="note-expand desc-expand"><summary>Show note</summary><p class="h3-note">Set the two ranges under Date &rarr; Compare Ranges. Leads are counted by the day they were created, and the Sales Rep, Call 1, Booking Source and Proposal Status filters apply to both ranges. Meetings and proposals are for the leads created in each range, so recent ranges can still grow.</p></details>
-      <div class="table-scroll"><div id="call2RangeCompareOut"></div></div>
     </div>
   </div>
   <div class="section">
@@ -1333,7 +1311,7 @@
           <div id="hist2025DateCustomControls" style="display:none;">
             <label class="date-range-label">From<input type="date" id="hist2025DateCustomStart" onchange="onHist2025DateFilterChange()"></label>
             <label class="date-range-label">To<input type="date" id="hist2025DateCustomEnd" onchange="onHist2025DateFilterChange()"></label>
-            <p class="h3-note" style="margin:4px 0 0;">Snaps to whole months, matching the table above.</p>
+            <p class="h3-note" style="margin:4px 0 0;">Exact dates, to the day.</p>
           </div>
           <button type="button" class="multi-select-clear" onclick="clearHist2025DateFilter()">Clear (All Dates)</button>
         </div>
@@ -1925,7 +1903,7 @@
           <div id="arugaDateCustomControls" style="display:none;">
             <label class="date-range-label">From<input type="date" id="arugaDateCustomStart" onchange="onArugaDateFilterChange()"></label>
             <label class="date-range-label">To<input type="date" id="arugaDateCustomEnd" onchange="onArugaDateFilterChange()"></label>
-            <p class="h3-note" style="margin:4px 0 0;">Snaps to whole months, matching the table above.</p>
+            <p class="h3-note" style="margin:4px 0 0;">Exact dates, to the day.</p>
           </div>
           <button type="button" class="multi-select-clear" onclick="clearArugaDateFilter()">Clear (All Dates)</button>
         </div>
@@ -3183,7 +3161,7 @@ function deriveDatasetsForRange(startStr, endStr) {
   fbLeadsByMonth = {};
   monthly.forEach(m => { fbLeadsByMonth[m.month] = m.leads; });
   conversionLeads = inRange.filter(l => l.att).map(l => ({
-    n: l.n, rep: l.host, s: l.att, m: monthKeyOf(l.d), p: l.p.map(p => p.stage)
+    n: l.n, d: l.d, rep: l.host, s: l.att, m: monthKeyOf(l.d), p: l.p.map(p => p.stage)
   }));
   // Total Proposals Sent/Win Rate/Total Amount below come from all 44 proposals directly linked to
   // a specific lead via a real record relationship in allLeads (originally 36 - Wendy Rose's live-lead
@@ -3794,10 +3772,8 @@ function onCall2DateModeChange(mode) {
   call2DateFilter.mode = mode;
   document.getElementById("call2DateMonthControls").style.display = mode === "month" ? "block" : "none";
   document.getElementById("call2DateCustomControls").style.display = mode === "custom" ? "block" : "none";
-  document.getElementById("call2DateCompareControls").style.display = mode === "compare" ? "block" : "none";
   updateCall2DateToggleLabel();
   renderCall2Table();
-  renderCall2RangeCompare();
 }
 function onCall2DateFilterChange() {
   const startEl = document.getElementById("call2DateCustomStart");
@@ -3818,11 +3794,9 @@ function clearCall2DateFilter() {
   if (endEl) endEl.value = '';
   updateCall2DateToggleLabel();
   renderCall2Table();
-  renderCall2RangeCompare();
 }
 function updateCall2DateToggleLabel() {
   const btn = document.getElementById("call2DateMultiSelectToggle");
-  if (call2DateFilter.mode === "compare") { btn.textContent = "Compare Ranges"; btn.classList.add("has-selection"); return; }
   const q = getCall2DateQualifyingMonths();
   if (!q) { btn.textContent = "Date"; btn.classList.remove("has-selection"); return; }
   if (call2DateFilter.mode === "month") {
@@ -3850,8 +3824,12 @@ function monthLabelsBetween(startStr, endStr) {
 // Returns null when no Date filter is active (every month in scope), otherwise a Set of qualifying
 // month labels - "By Month" mode can now check off multiple months directly, "Custom Range" mode
 // expands the chosen start/end dates out to every month they touch.
+// Custom Range is exact to the day (not snapped to whole months): returns {start,end} or null.
+function getCall2ExactRange() {
+  if (call2DateFilter.mode !== "custom" || (!call2DateFilter.start && !call2DateFilter.end)) return null;
+  return { start: call2DateFilter.start || DATA_MIN_DATE, end: call2DateFilter.end || DATA_MAX_DATE };
+}
 function getCall2DateQualifyingMonths() {
-  if (call2DateFilter.mode === "compare") return null;
   if (call2DateFilter.mode === "month") {
     return call2DateFilter.months.length ? new Set(call2DateFilter.months) : null;
   }
@@ -3938,6 +3916,7 @@ function getCall2FilterScope() {
   const bookedViaFilters = call2MultiFilters.bookedVia.selected;
   const proposalStatusFilters = call2MultiFilters.proposalStatus.selected;
   const dateQualifying = getCall2DateQualifyingMonths();
+  const exactRange = getCall2ExactRange();
   const startElBv = document.getElementById("reportRangeStart");
   const endElBv = document.getElementById("reportRangeEnd");
   const rangeStartBv = (startElBv && startElBv.value) || DATA_MIN_DATE;
@@ -3947,13 +3926,15 @@ function getCall2FilterScope() {
     (bookedFilters.length === 0 || bookedFilters.includes('Booked')) &&
     (bookedViaFilters.length === 0 || bookedViaFilters.includes(getBookedVia(l.n))) &&
     (proposalStatusFilters.length === 0 || proposalStatusFilters.some(ps => ps === 'No Proposal' ? l.p.length === 0 : l.p.includes(ps))) &&
-    (dateQualifying === null || dateQualifying.has(l.m))
+    (dateQualifying === null || dateQualifying.has(l.m)) &&
+    (!exactRange || (l.d >= exactRange.start && l.d <= exactRange.end))
   );
   const leadsInScope = meetingsInScope.filter(l => statusFilters.length === 0 || statusFilters.includes(l.s));
   const monthsToShow = dateQualifying === null ? repMonthOrder : repMonthOrder.filter(m => dateQualifying.has(m));
   const allLeadsInRangeBv = allLeads.filter(l => l.d >= rangeStartBv && l.d <= rangeEndBv &&
     (repFilters.length === 0 || repFilters.includes(l.host || l.owner)) &&
-    (dateQualifying === null || dateQualifying.has(monthKeyOf(l.d))));
+    (dateQualifying === null || dateQualifying.has(monthKeyOf(l.d))) &&
+    (!exactRange || (l.d >= exactRange.start && l.d <= exactRange.end)));
   return { repFilters, bookedFilters, statusFilters, bookedViaFilters, proposalStatusFilters, dateQualifying, meetingsInScope, leadsInScope, monthsToShow, allLeadsInRangeBv };
 }
 function renderCall2Table() {
@@ -6406,120 +6387,6 @@ function downloadArugaLeadsCSV() {
   document.body.removeChild(a);
   URL.revokeObjectURL(url);
 }
-// Compare Date Ranges (2026 Filter & Drill): two exact, day-level ranges side by side. Reuses the
-// same Sales Rep / Call 1 Booked / Call 1 Status / Booking Source / Proposal Status filters as the
-// Matching Leads table, but ignores the month Date filter and Report Period (A and B are the dates).
-function call2LeadPassesFilters(l) {
-  const repFilters = call2SelectedReps;
-  const bookedFilters = call2MultiFilters.booked.selected;
-  const statusFilters = call2MultiFilters.status.selected;
-  const bookedViaFilters = call2MultiFilters.bookedVia.selected;
-  const proposalStatusFilters = call2MultiFilters.proposalStatus.selected;
-  const rep = l.host || l.owner;
-  if (repFilters.length && !repFilters.includes(rep)) return false;
-  if (bookedFilters.length) {
-    const bookedLabel = (l.att && l.att.trim() !== '') ? 'Booked' : 'Not Booked';
-    if (!bookedFilters.includes(bookedLabel)) return false;
-  }
-  if (statusFilters.length && !statusFilters.includes(l.att)) return false;
-  if (bookedViaFilters.length && !bookedViaFilters.includes(getBookedVia(l.n))) return false;
-  if (proposalStatusFilters.length) {
-    const ok = proposalStatusFilters.some(ps => ps === 'No Proposal' ? l.p.length === 0 : l.p.some(p => p.stage === ps));
-    if (!ok) return false;
-  }
-  return true;
-}
-function call2RangeStats(start, end) {
-  const leads = allLeads.filter(l => l.d >= start && l.d <= end && call2LeadPassesFilters(l));
-  const s = { leads: leads.length, meetings: 0, system: 0, rep: 0, notBooked: 0, attended: 0, noShow: 0, proposals: 0, won: 0, lost: 0, awaiting: 0, amt: 0, leadsWithProposal: 0 };
-  leads.forEach(l => {
-    if (l.att && l.att.trim() !== '') s.meetings++;
-    if (l.att === 'Attended') s.attended++;
-    if (l.att === 'No Show') s.noShow++;
-    const bv = getBookedVia(l.n);
-    if (bv === 'System') s.system++; else if (bv === 'Rep') s.rep++; else s.notBooked++;
-    if (l.p.length) s.leadsWithProposal++;
-    l.p.forEach(p => {
-      s.proposals++; s.amt += p.amt || 0;
-      if (p.stage === 'Closed Won') s.won++; else if (p.stage === 'Closed Lost') s.lost++; else s.awaiting++;
-    });
-  });
-  return s;
-}
-function call2CmpIso(d) { return d.getFullYear() + '-' + String(d.getMonth() + 1).padStart(2, '0') + '-' + String(d.getDate()).padStart(2, '0'); }
-function setCall2ComparePreset(kind) {
-  const end = new Date(DATA_MAX_DATE + 'T00:00:00');
-  let aS, aE, bS, bE;
-  if (kind === 'month') {
-    bS = new Date(end.getFullYear(), end.getMonth(), 1); bE = end;
-    aS = new Date(end.getFullYear(), end.getMonth() - 1, 1); aE = new Date(end.getFullYear(), end.getMonth(), 0);
-  } else {
-    const n = kind === 'week' ? 7 : parseInt(kind, 10);
-    bE = end; bS = new Date(end); bS.setDate(bS.getDate() - (n - 1));
-    aE = new Date(bS); aE.setDate(aE.getDate() - 1); aS = new Date(aE); aS.setDate(aS.getDate() - (n - 1));
-  }
-  document.getElementById('cmpAStart').value = call2CmpIso(aS); document.getElementById('cmpAEnd').value = call2CmpIso(aE);
-  document.getElementById('cmpBStart').value = call2CmpIso(bS); document.getElementById('cmpBEnd').value = call2CmpIso(bE);
-  renderCall2RangeCompare();
-}
-function renderCall2RangeCompare() {
-  const out = document.getElementById('call2RangeCompareOut');
-  if (!out) return;
-  const wrap = document.getElementById('call2RangeCompareWrap');
-  const on = call2DateFilter.mode === 'compare';
-  if (wrap) wrap.style.display = on ? 'block' : 'none';
-  if (!on) return;
-  const v = id => document.getElementById(id).value;
-  const aS = v('cmpAStart'), aE = v('cmpAEnd'), bS = v('cmpBStart'), bE = v('cmpBEnd');
-  if (!aS || !aE || !bS || !bE) { out.innerHTML = '<p class="h3-note">Pick a start and end date for both ranges, or use a quick comparison above.</p>'; return; }
-  if (aS > aE || bS > bE) { out.innerHTML = '<p class="h3-note">A range\'s start date must be on or before its end date.</p>'; return; }
-  const A = call2RangeStats(aS, aE), B = call2RangeStats(bS, bE);
-  const fmtD = s => new Date(s + 'T00:00:00').toLocaleDateString('en-US', { month: 'short', day: 'numeric', year: 'numeric' });
-  const dayCount = (s, e) => Math.round((new Date(e + 'T00:00:00') - new Date(s + 'T00:00:00')) / 86400000) + 1;
-  const pct = (n, d) => d ? (n / d * 100) : null;
-  const rows = [
-    ['Leads', A.leads, B.leads, 'n'],
-    ['Leads per day', A.leads / dayCount(aS, aE), B.leads / dayCount(bS, bE), 'd'],
-    ['Booked in system', A.system, B.system, 'n'],
-    ['Booked by sales rep', A.rep, B.rep, 'n'],
-    ['Not booked', A.notBooked, B.notBooked, 'n'],
-    ['Total meetings', A.meetings, B.meetings, 'n'],
-    ['Lead \u2192 Meeting %', pct(A.meetings, A.leads), pct(B.meetings, B.leads), 'p'],
-    ['Call 1 attended', A.attended, B.attended, 'n'],
-    ['Show rate %', pct(A.attended, A.meetings), pct(B.attended, B.meetings), 'p'],
-    ['Proposals', A.proposals, B.proposals, 'n'],
-    ['Closed won', A.won, B.won, 'n'],
-    ['Closed lost', A.lost, B.lost, 'n'],
-    ['Awaiting acceptance', A.awaiting, B.awaiting, 'n'],
-    ['Win rate % (won \u00f7 won + lost)', pct(A.won, A.won + A.lost), pct(B.won, B.won + B.lost), 'p'],
-    ['Total proposal amount', A.amt, B.amt, '$']
-  ];
-  const fmt = (x, t) => x === null ? '&mdash;' : t === 'p' ? x.toFixed(1) + '%' : t === '$' ? fmtUSD(x) : t === 'd' ? x.toFixed(1) : String(x);
-  const body = rows.map(([label, a, b, t]) => {
-    let chg = '&mdash;', cls = '';
-    if (a !== null && b !== null) {
-      const diff = b - a;
-      const sign = diff > 0 ? '+' : '';
-      if (t === 'p') chg = sign + diff.toFixed(1) + ' pts';
-      else {
-        const rel = a ? ' (' + sign + (diff / a * 100).toFixed(0) + '%)' : '';
-        chg = sign + (t === '$' ? fmtUSD(diff) : t === 'd' ? diff.toFixed(1) : String(diff)) + rel;
-      }
-      cls = diff > 0 ? 'color:var(--green-deep);' : diff < 0 ? 'color:#b3261e;' : '';
-    }
-    return '<tr><td>' + label + '</td><td>' + fmt(a, t) + '</td><td>' + fmt(b, t) + '</td><td style="' + cls + 'font-weight:600;">' + chg + '</td></tr>';
-  }).join('');
-  out.innerHTML = '<table><thead><tr><th>Metric</th><th>Range A<br><span style="font-weight:400;font-size:11px;">' + fmtD(aS) + ' \u2013 ' + fmtD(aE) + ' (' + dayCount(aS, aE) + ' days)</span></th><th>Range B<br><span style="font-weight:400;font-size:11px;">' + fmtD(bS) + ' \u2013 ' + fmtD(bE) + ' (' + dayCount(bS, bE) + ' days)</span></th><th>Change (B vs A)</th></tr></thead><tbody>' + body + '</tbody></table>';
-}
-(function initCall2RangeCompare() {
-  ['cmpAStart', 'cmpAEnd', 'cmpBStart', 'cmpBEnd'].forEach(id => { const el = document.getElementById(id); if (el) { el.min = DATA_MIN_DATE; el.max = DATA_MAX_DATE; } });
-  setCall2ComparePreset('week');
-})();
-// Keep the comparison in sync whenever the filter bar re-renders Matching Leads.
-(function hookCall2RangeCompare() {
-  const orig = renderCall2MatchingLeads;
-  renderCall2MatchingLeads = function () { orig.apply(this, arguments); renderCall2RangeCompare(); };
-})();
 function triggerCsvDownload(headers, rows, filenamePrefix) {
   const csv = headers.map(csvCell).join(',') + '\n' + rows.join('\n');
   const blob = new Blob([csv], { type: 'text/csv;charset=utf-8;' });
@@ -6543,6 +6410,7 @@ function getCall2FilteredLeads() {
   const bookedViaFilters = call2MultiFilters.bookedVia.selected;
   const proposalStatusFilters = call2MultiFilters.proposalStatus.selected;
   const dateQualifying = getCall2DateQualifyingMonths();
+  const exactRange = getCall2ExactRange();
   const startEl = document.getElementById("reportRangeStart");
   const endEl = document.getElementById("reportRangeEnd");
   const start = (startEl && startEl.value) || DATA_MIN_DATE;
@@ -6568,6 +6436,7 @@ function getCall2FilteredLeads() {
       if (!matchesProposalFilter) return false;
     }
     if (dateQualifying !== null && !dateQualifying.has(monthKeyOf(l.d))) return false;
+    if (exactRange && (l.d < exactRange.start || l.d > exactRange.end)) return false;
     return true;
   });
 }
