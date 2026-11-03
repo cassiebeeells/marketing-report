@@ -2948,9 +2948,15 @@
   <p class="h3-note" id="arugaWeeklySub" style="margin:0 0 10px;">Choose any report Aruga Digital has sent (weekly or monthly) to see its summary. Figures are as Aruga published them, so Call 1 and CRM counts can differ slightly from this dashboard's Zoho-based numbers.</p>
   <div class="rep-detail-filters filter-bar-prominent" style="padding:0 0 6px;align-items:flex-end;">
     <label class="date-range-label">Report<select id="arugaReportPick" class="period-date-input" style="min-width:320px;max-width:100%;" onchange="renderArugaReport()"></select></label>
+    <label class="date-range-label" id="arugaCmpLabel">Compare with<select id="arugaCmpPick" class="period-date-input" style="min-width:240px;max-width:100%;" onchange="renderArugaRptCompare()"></select></label>
   </div>
   <p class="h3-note" id="arugaRptHead" style="margin:6px 0 0;color:var(--muted);font-size:12px;"></p>
   <div class="callout-row" id="arugaRptKpis"></div>
+  <div id="arugaCmpWrap" style="display:none;">
+    <h3 class="h3-note" id="arugaCmpTitle" style="margin:20px 0 4px;font-size:13px;color:var(--heading);font-weight:700;"></h3>
+    <div class="glance-cmp-grid" id="arugaCmpCards"></div>
+    <p class="glance-vis-note" id="arugaCmpNote"></p>
+  </div>
   <h3 class="h3-note" style="margin:20px 0 6px;font-size:13px;color:var(--heading);font-weight:700;">Summary</h3>
   <div id="arugaRptSummary"></div>
   <h3 class="h3-note" id="arugaRptAdsH" style="margin:18px 0 6px;font-size:13px;color:var(--heading);font-weight:700;"></h3>
@@ -7840,7 +7846,42 @@ function renderArugaReport() {
     r.ads.map(c => `<tr><td>${c[0]}</td><td>${c[1] === null ? '&mdash;' : fmtUSD2(c[1])}</td><td>${c[2]}</td><td>${c[3] === null ? '&mdash;' : fmtUSD2(c[3])}</td></tr>`).join('') + '</tbody></table>' : '';
   document.getElementById('arugaRptSteps').innerHTML = r.steps.map(s => `<li>${s}</li>`).join('');
   document.getElementById('arugaRptNote').textContent = r.note || '';
+  // compare dropdown: only for weekly reports; default = the week before
+  const cmpEl = document.getElementById('arugaCmpPick'), isW = r.kind === 'Weekly';
+  document.getElementById('arugaCmpLabel').style.display = isW ? '' : 'none';
+  if (isW) {
+    const wk = arugaReports.filter(x => x.kind === 'Weekly' && x.id !== r.id);
+    const idx = arugaReports.filter(x => x.kind === 'Weekly').findIndex(x => x.id === r.id), all = arugaReports.filter(x => x.kind === 'Weekly');
+    const prev = all[idx + 1];
+    cmpEl.innerHTML = '<option value="">No comparison</option>' + wk.map(x => `<option value="${x.id}">${x.label}</option>`).join('');
+    cmpEl.value = prev ? prev.id : '';
+  }
+  renderArugaRptCompare();
   renderArugaTrend(r);
+}
+function arugaTrendFor(rep) { const st = '2026-' + rep.id.slice(2, 4) + '-' + rep.id.slice(4); return arugaWeeklyTrend.find(w => w.s === st); }
+function renderArugaRptCompare() {
+  const selR = arugaReports.find(x => x.id === document.getElementById('arugaReportPick').value) || arugaReports[0];
+  const wrap = document.getElementById('arugaCmpWrap'), cmpId = document.getElementById('arugaCmpPick').value;
+  const bR = arugaReports.find(x => x.id === cmpId);
+  if (selR.kind !== 'Weekly' || !bR) { wrap.style.display = 'none'; return; }
+  const A = arugaTrendFor(selR), B = arugaTrendFor(bR); if (!A || !B) { wrap.style.display = 'none'; return; }
+  wrap.style.display = '';
+  const rate = w => (w.crm && w.booked !== null) ? w.booked / w.crm * 100 : null;
+  const a = Object.assign({}, A, { rate: rate(A) }), b = Object.assign({}, B, { rate: rate(B) });
+  document.getElementById('arugaCmpTitle').innerHTML = `Comparison: ${selR.period} <span style="color:var(--muted);font-weight:500;">vs</span> ${bR.period}`;
+  // [title, key, formatter, direction: 1 higher is better, -1 lower is better, 0 neutral]
+  const defs = [['Amount spent', 'spend', v => fmtUSD2(v), 0], ['Meta leads', 'leads', v => String(v), 1], ['Cost per lead', 'cpl', v => fmtUSD2(v), -1],
+    ['CRM leads', 'crm', v => String(v), 1], ['Call 1 booked', 'booked', v => String(v), 1], ['Leads \u2192 Call 1 booked', 'rate', v => v.toFixed(1) + '%', 1]];
+  document.getElementById('arugaCmpCards').innerHTML = defs.map(([t, k, f, dir]) => {
+    const va = a[k], vb = b[k];
+    if (va === null || va === undefined || vb === null || vb === undefined) return `<div class="glance-cmp-card"><div class="t">${t}</div><div class="a">${va == null ? '&mdash;' : f(va)}</div><div class="b">vs ${vb == null ? 'not reported' : f(vb)}</div><span class="d flat">n/a</span></div>`;
+    const d = va - vb, same = Math.abs(d) < 0.005, cls = same || dir === 0 ? 'flat' : ((d > 0) === (dir > 0) ? 'up' : 'down');
+    const txt = k === 'rate' ? (d > 0 ? '+' : '') + d.toFixed(1) + ' pts' : (vb ? (d > 0 ? '+' : '') + (d / vb * 100).toFixed(0) + '%' : '+' + f(d));
+    const mx = Math.max(va, vb) || 1;
+    return `<div class="glance-cmp-card"><div class="t">${t}</div><div class="a">${f(va)}</div><div class="b">vs ${f(vb)}</div><span class="d ${cls}">${same ? 'no change' : (d > 0 ? '\u25B2 ' : '\u25BC ') + txt}</span><div class="glance-cmp-bars"><div style="width:${va / mx * 100}%;background:var(--blue);" title="${selR.period}"></div><div style="width:${vb / mx * 100}%;background:var(--blue-tint);" title="${bR.period}"></div></div></div>`;
+  }).join('');
+  document.getElementById('arugaCmpNote').textContent = 'Large number = the selected week; light bar = the comparison week. Green is better, red is worse (lower is better for cost per lead); spend has no good/bad color. Uses Aruga\'s latest figures for each week; CRM and Call 1 counts were not reported for the first three weeks.';
 }
 function renderArugaTrend(sel) {
   const W = arugaWeeklyTrend, fd = iso => new Date(iso + 'T00:00:00Z').toLocaleDateString('en-US', { month: 'short', day: 'numeric', timeZone: 'UTC' });
