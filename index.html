@@ -2887,7 +2887,12 @@
       <select id="glanceFMode" class="period-date-input" onchange="onGlanceFilterModeChange()">
         <option value="ytd" selected>Year to date</option><option value="month">Specific month</option><option value="week">Specific week</option><option value="custom">Custom dates</option>
       </select></label>
-    <label class="date-range-label" id="glanceFPickWrap" style="display:none;">Choose<select id="glanceFPick" class="period-date-input" onchange="renderGlanceVisuals()"></select></label>
+    <div class="date-range-label" id="glanceFPickWrap" style="display:none;">Choose (select one or more)
+      <div class="multi-select" id="glanceFPickMS" style="display:block;">
+        <button type="button" class="multi-select-toggle has-selection" id="glanceFPickBtn" onclick="toggleGlancePickPanel(event)" style="min-width:210px;text-align:left;">Select</button>
+        <div class="multi-select-panel" id="glanceFPickPanel" style="display:none;max-height:300px;overflow-y:auto;"></div>
+      </div>
+    </div>
     <span id="glanceFCustom" style="display:none;gap:8px;flex-wrap:wrap;align-items:flex-end;">
       <label class="date-range-label">From<input type="date" id="glanceFStart" class="period-date-input" onchange="renderGlanceVisuals()"></label>
       <label class="date-range-label">To<input type="date" id="glanceFEnd" class="period-date-input" onchange="renderGlanceVisuals()"></label>
@@ -7645,7 +7650,24 @@ function glancePeriodOptions(mode) {
   }
   return out;
 }
-let glanceFOpts = [];
+let glanceFOpts = [], glanceFSel = [];
+function buildGlancePickPanel() {
+  const panel = document.getElementById('glanceFPickPanel');
+  panel.innerHTML = glanceFOpts.map((o, i) => `<label><input type="checkbox" value="${i}" ${glanceFSel.includes(i) ? 'checked' : ''} onchange="onGlancePickChange()"> ${o.label}</label>`).join('') +
+    '<button type="button" class="multi-select-clear" onclick="clearGlancePick()">Reset to latest</button>';
+  updateGlancePickLabel();
+}
+function toggleGlancePickPanel(e) { e.stopPropagation(); const p = document.getElementById('glanceFPickPanel'); p.style.display = p.style.display === 'none' ? 'block' : 'none'; }
+document.addEventListener('click', function (e) { const w = document.getElementById('glanceFPickMS'), p = document.getElementById('glanceFPickPanel'); if (w && p && !w.contains(e.target)) p.style.display = 'none'; });
+function onGlancePickChange() {
+  glanceFSel = Array.from(document.querySelectorAll('#glanceFPickPanel input[type=checkbox]:checked')).map(c => +c.value).sort((a, b) => a - b);
+  updateGlancePickLabel(); renderGlanceVisuals();
+}
+function clearGlancePick() { onGlanceFilterModeChange(); }
+function updateGlancePickLabel() {
+  const btn = document.getElementById('glanceFPickBtn'), mode = document.getElementById('glanceFMode').value, unit = mode === 'month' ? 'months' : 'weeks';
+  btn.textContent = glanceFSel.length === 0 ? 'Select ' + unit : (glanceFSel.length === 1 ? glanceFOpts[glanceFSel[0]].label : glanceFSel.length + ' ' + unit + ' selected');
+}
 function onGlanceFilterModeChange() {
   const mode = document.getElementById('glanceFMode').value;
   document.getElementById('glanceFPickWrap').style.display = (mode === 'month' || mode === 'week') ? '' : 'none';
@@ -7654,10 +7676,9 @@ function onGlanceFilterModeChange() {
   document.getElementById('glanceFCmpWrap').style.display = mode === 'ytd' ? 'none' : '';
   if (mode === 'month' || mode === 'week') {
     glanceFOpts = glancePeriodOptions(mode);
-    const el = document.getElementById('glanceFPick');
-    el.innerHTML = glanceFOpts.map((o, i) => `<option value="${i}">${o.label}</option>`).join('');
     // default to the last COMPLETED period
-    const n = glanceFOpts.length; el.value = String(glanceFOpts[n - 1].label.includes('so far') && n > 1 ? n - 2 : n - 1);
+    const n = glanceFOpts.length; glanceFSel = [glanceFOpts[n - 1].label.includes('so far') && n > 1 ? n - 2 : n - 1];
+    buildGlancePickPanel();
   } else if (mode === 'custom') {
     ['glanceFStart', 'glanceFEnd'].forEach(id => { const x = document.getElementById(id); x.min = GLANCE_START; x.max = DATA_MAX_DATE; });
     if (!document.getElementById('glanceFEnd').value) { document.getElementById('glanceFEnd').value = DATA_MAX_DATE; document.getElementById('glanceFStart').value = glanceIsoAdd(DATA_MAX_DATE, -13); }
@@ -7699,6 +7720,40 @@ function glanceBuckets(s, e) {
   }
   return out;
 }
+// Several months/weeks selected: show every selected period side by side (oldest to newest, latest darkest).
+function renderGlanceMulti(mode, periods) {
+  const kpiEl = document.getElementById('glanceKpiRow'), cmpBox = document.getElementById('glanceCmpVisual'), timeBox = document.getElementById('glanceTimeBlock');
+  const unit = mode === 'month' ? 'months' : 'weeks';
+  const lbl = p => mode === 'month' ? new Date(p.s + 'T00:00:00Z').toLocaleDateString('en-US', { month: 'short', year: 'numeric', timeZone: 'UTC' }) + (p.label.includes('so far') ? ' (so far)' : '') : glanceFmtD(p.s) + ' \u2013 ' + glanceFmtD(p.e);
+  const S = periods.map(p => Object.assign({ label: lbl(p) }, glanceStats(p.s, p.e)));
+  document.getElementById('glanceSnapTitle').innerHTML = 'Performance Snapshot &mdash; ' + S.length + ' ' + unit + ' compared';
+  document.getElementById('glanceFCmpWrap').style.display = 'none';
+  document.getElementById('glanceFLabel').innerHTML = `Comparing <strong>${S.map(s => s.label).join(', ')}</strong>. Each bar is that ${mode}'s own total; the badge shows the change from the first to the last ${mode} selected.`;
+  kpiEl.style.display = 'none';
+  // colors: light blue (oldest) to deep blue (newest)
+  const c0 = [188, 218, 237], c1 = [31, 107, 162], col = i => { const t = S.length === 1 ? 1 : i / (S.length - 1); return `rgb(${c0.map((v, k) => Math.round(v + (c1[k] - v) * t)).join(',')})`; };
+  const txt = i => (S.length === 1 || i / (S.length - 1) >= 0.45) ? '#fff' : 'var(--navy)';
+  document.getElementById('glanceCmpVisLegend').innerHTML = S.map((s, i) => `<span><i class="cmpv-swatch" style="background:${col(i)};height:12px;width:12px;"></i>${s.label}</span>`).join('');
+  const fmtMoney = v => fmtUSD(v), fmtMoney2 = v => v === null ? '\u2014' : fmtUSD2(v), fmtN = v => v.toLocaleString(), fmtP = v => v === null ? '\u2014' : v.toFixed(1) + '%';
+  const badge = (va, vb, dir, pts, f) => {
+    if (va === null || vb === null) return '<span class="cmpv-badge flat">n/a</span>';
+    const d = vb - va; if (Math.abs(d) < 0.005) return '<span class="cmpv-badge flat">no change</span>';
+    const cls = dir === 0 ? 'flat' : ((d > 0) === (dir > 0) ? 'up' : 'down');
+    const t = pts ? Math.abs(d).toFixed(1) + ' pts' : (va ? Math.abs(d / va * 100).toFixed(0) + '%' : '+' + f(Math.abs(d)));
+    return `<span class="cmpv-badge ${cls}">${d > 0 ? '\u25B2' : '\u25BC'} ${t}</span>`;
+  };
+  const rows = (title, key, f, dir, pts, getter) => {
+    const vals = S.map(s => getter ? getter(s) : s[key]), mx = Math.max(...vals.map(v => v || 0)) || 1;
+    return `<div class="cmpv-row"><div class="cmpv-top"><span>${title}</span>${badge(vals[0], vals[vals.length - 1], dir, pts, f)}</div>` +
+      vals.map((v, i) => `<div class="cmpv-track" style="margin-top:${i ? 4 : 0}px;"><div class="cmpv-fill" style="width:${v === null ? 0 : Math.max(v > 0 ? 2 : 0, v / mx * 100)}%;background:${col(i)};color:${txt(i)};"><span class="cmpv-lbl">${S[i].label}</span><span class="cmpv-num">${v === null ? '\u2014' : f(v)}</span></div></div>`).join('') + '</div>';
+  };
+  document.getElementById('glanceCmpVisMetrics').innerHTML =
+    rows('Ad spend', 'spend', fmtMoney, 0) + rows('Facebook leads', 'leads', fmtN, 1) + rows('Ad spend per lead', 'cpl', fmtMoney2, -1) + rows('Meetings booked', 'booked', fmtN, 1) +
+    rows('Meetings attended', 'attended', fmtN, 1) + rows('Show rate', 'show', fmtP, 1, true) + rows('Proposals won ($)', 'won', fmtMoney, 1) + rows('Pending proposals ($)', 'pending', fmtMoney, 0) + rows('Lost proposals ($)', 'lost', fmtMoney, 0);
+  document.getElementById('glanceCmpVisFunnel').innerHTML =
+    rows('Facebook leads', 'leads', fmtN, 1) + rows('Booked a meeting', 'booked', fmtN, 1) + rows('Attended', 'attended', fmtN, 1) + rows('Received a proposal', 'withProp', fmtN, 1) + rows('Closed won', 'wonLeads', fmtN, 1);
+  cmpBox.style.display = ''; timeBox.style.display = 'none';
+}
 function renderGlanceVisuals() {
   const kpiEl = document.getElementById('glanceKpiRow'); if (!kpiEl) return;
   const mode = document.getElementById('glanceFMode').value;
@@ -7708,7 +7763,13 @@ function renderGlanceVisuals() {
     const sv = document.getElementById('glanceFStart').value, ev = document.getElementById('glanceFEnd').value;
     if (!sv || !ev || sv > ev) { kpiEl.innerHTML = '<p class="h3-note">Choose a valid start and end date.</p>'; return; }
     P = { s: sv, e: ev }; label = glanceFmtDY(sv) + ' \u2013 ' + glanceFmtDY(ev);
-  } else { P = glanceFOpts[+document.getElementById('glanceFPick').value]; label = P.label.replace(' (so far)', ''); }
+  } else {
+    if (!glanceFSel.length) { kpiEl.innerHTML = '<p class="h3-note">Choose at least one ' + mode + ' from the list above.</p>'; return; }
+    if (glanceFSel.length >= 2) { renderGlanceMulti(mode, glanceFSel.map(i => glanceFOpts[i])); return; }
+    P = glanceFOpts[glanceFSel[0]]; label = P.label.replace(' (so far)', '');
+  }
+  document.getElementById('glanceFCmpWrap').style.display = mode === 'ytd' ? 'none' : '';
+  document.getElementById('glanceKpiRow').style.display = '';
   document.getElementById('glanceSnapTitle').innerHTML = 'Performance Snapshot &mdash; ' + label;
   // previous period of equal length (a calendar month for months), only when it falls inside 2026 data
   let PV = null;
