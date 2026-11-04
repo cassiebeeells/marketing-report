@@ -1004,7 +1004,16 @@
   .glance-split { display:grid; grid-template-columns: minmax(0,1fr); gap: 20px; align-items:start; }
   .glance-split.has-detail { grid-template-columns: minmax(0,1.45fr) minmax(0,1fr); }
   @media (max-width: 900px) { .glance-split.has-detail { grid-template-columns: minmax(0,1fr); } }
-  .glance-split-detail { display:none; }
+  .glance-split-detail { display:none; min-width:0; }
+  #glanceSplit1.has-detail { grid-template-columns: minmax(0,1fr) minmax(0,1.6fr); }
+  .gc-wrap { overflow-x:auto; margin-top:8px; }
+  .gc-t { border-collapse: collapse; font-size: 12px; white-space: nowrap; }
+  .gc-t th, .gc-t td { padding: 4px 10px; text-align: right; border-bottom: 1px solid var(--line); }
+  .gc-t th { color: var(--heading); font-weight:800; vertical-align: bottom; }
+  .gc-t td.gc-l { text-align:left; color: var(--muted); position: sticky; left: 0; background: var(--card-bg2); }
+  .gc-t .gc-sel { background: var(--blue-tint); font-weight: 800; }
+  .gc-pick { cursor: pointer; text-decoration: underline dotted; }
+  .gc-d { font-size: 11px; font-weight: 700; } .gc-n { color: var(--muted); font-weight:600; } .gc-g { color: #1a8a4a; } .gc-b { color: #c0392b; }
   .glance-split.has-detail .glance-split-detail { display:block; }
   .glance-detail { background: var(--card-bg2); border:1px solid var(--line); border-left: 4px solid var(--blue-deep); border-radius: 10px; padding: 14px 16px; position: relative; font-size: 13px; line-height: 1.45; color: var(--heading); }
   .glance-detail .gt-title { font-size: 17px; font-weight: 800; padding-right: 70px; }
@@ -7711,6 +7720,7 @@ function onGlanceFilterModeChange() {
 }
 // ---- Custom hover tooltip for the Marketing at a Glance charts (works on hover and on tap) ----
 const glanceTipMap = {};
+const glanceStatsMap = {};
 function glanceTipHtml(m) {
   const money = v => fmtUSD(v), pct = (a, b) => b ? (a / b * 100).toFixed(1) + '%' : '\u2014';
   const closed = m.wonN + m.lostN;
@@ -7720,6 +7730,37 @@ function glanceTipHtml(m) {
     `<div class="gt-sec">Meetings</div>` + row('Booked a meeting', m.booked + ' (' + pct(m.booked, m.leads) + ' of leads)') + row('Attended', m.attended + ' (' + pct(m.attended, m.booked) + ' of booked)') +
     `<div class="gt-sec">Proposals from these leads</div>` + row('Proposals', m.props) + row('Won', money(m.won) + ' (' + m.wonN + ')', 1) + row('Pending', money(m.pending) + ' (' + m.pendingN + ')') + row('Lost', money(m.lost) + ' (' + m.lostN + ')') +
     `<div class="gt-sec">Return</div>` + row('Win rate (won \u00f7 won + lost)', closed ? pct(m.wonN, closed) : '\u2014') + row('Won per $1 of ad spend', '$' + (m.spend ? (m.won / m.spend).toFixed(2) : '0.00'), 1);
+}
+// Compare view: the clicked period on the left, every other period to its right, each with the change vs. the clicked one.
+function glanceCompareHtml(key) {
+  const idx = Object.keys(glanceStatsMap).filter(k => k.startsWith('c1-')).map(k => +k.slice(3)).sort((a, b) => a - b);
+  const sel = glanceStatsMap[key]; if (!sel) return glanceTipMap[key];
+  const cols = [key].concat(idx.map(i => 'c1-' + i).filter(k => k !== key));
+  const cl = m => (m.wonN + m.lostN) ? m.wonN / (m.wonN + m.lostN) * 100 : null;
+  const roi = m => m.spend ? m.won / m.spend : 0;
+  const rows = [
+    ['Ad spend', m => m.spend, v => fmtUSD(v), 0], ['Facebook leads', m => m.leads, v => v, 1], ['Ad spend per lead', m => m.cpl, v => v === null ? '\u2014' : fmtUSD2(v), -1],
+    ['Booked a meeting', m => m.booked, v => v, 1], ['Attended', m => m.attended, v => v, 1], ['Proposals', m => m.props, v => v, 1],
+    ['Won', m => m.won, v => fmtUSD(v), 1], ['Pending', m => m.pending, v => fmtUSD(v), 0], ['Lost', m => m.lost, v => fmtUSD(v), -1],
+    ['Win rate', cl, v => v === null ? '\u2014' : v.toFixed(0) + '%', 1], ['Won per $1 spent', roi, v => '$' + v.toFixed(2), 1]
+  ];
+  const delta = (v, base, dir) => {
+    if (v === null || base === null || base === undefined) return '';
+    if (!base) return v ? '<div class="gc-d gc-n">new</div>' : '';
+    const p = (v - base) / Math.abs(base) * 100; if (Math.abs(p) < 0.5) return '<div class="gc-d gc-n">same</div>';
+    const good = dir === 0 ? null : (dir > 0 ? p > 0 : p < 0);
+    return `<div class="gc-d ${good === null ? 'gc-n' : good ? 'gc-g' : 'gc-b'}">${p > 0 ? '+' : ''}${p.toFixed(0)}%</div>`;
+  };
+  let t = `<div class="gc-wrap"><table class="gc-t"><thead><tr><th></th>`;
+  cols.forEach((k, ci) => { const m = glanceStatsMap[k]; t += `<th class="${ci === 0 ? 'gc-sel' : ''}"><span data-tip="${k}" class="gc-pick" title="Click to compare against this one">${m.tipTitle}</span>${ci === 0 ? '<div class="gc-d gc-n">selected</div>' : '<div class="gc-d gc-n">vs selected</div>'}</th>`; });
+  t += `</tr></thead><tbody>`;
+  rows.forEach(([lab, fn, f, dir]) => {
+    const base = fn(sel);
+    t += `<tr><td class="gc-l">${lab}</td>`;
+    cols.forEach((k, ci) => { const m = glanceStatsMap[k], v = fn(m); t += `<td class="${ci === 0 ? 'gc-sel' : ''}"><div>${f(v)}</div>${ci === 0 ? '' : delta(v, base, dir)}</td>`; });
+    t += `</tr>`;
+  });
+  return t + `</tbody></table></div>`;
 }
 // Click a month/week column: the chart slides to the left and that period's full details open on the right.
 function glanceCloseDetail(splitId, detailId) {
@@ -7733,7 +7774,7 @@ function glanceOpenDetail(splitId, detailId, key, closeKey) {
   if (hot && hot.classList.contains('is-sel')) { glanceCloseDetail(splitId, detailId); return; }   // click the same column again to close
   sp.querySelectorAll('.glance-hot.is-sel').forEach(e => e.classList.remove('is-sel'));
   if (hot) hot.classList.add('is-sel');
-  dt.innerHTML = `<div class="glance-detail"><button type="button" class="glance-detail-close" onclick="glanceCloseDetail('${splitId}','${detailId}')" aria-label="Close details">&#10005; Close</button>${glanceTipMap[key]}<div class="gt-sub" style="margin-top:8px;">Click another column to switch, or the same one to close.</div></div>`;
+  dt.innerHTML = `<div class="glance-detail"><button type="button" class="glance-detail-close" onclick="glanceCloseDetail('${splitId}','${detailId}')" aria-label="Close details">&#10005; Close</button>${splitId === 'glanceSplit1' ? '<div class="gt-title">Compare with other periods</div><div class="gt-sub">Selected period on the left; the others to its right show the change vs. the selected one (green = better, red = worse). Click a column to change the selected period.</div>' + glanceCompareHtml(key) : glanceTipMap[key] + '<div class="gt-sub" style="margin-top:8px;">Click another column to switch, or the same one to close.</div>'}</div>`;
   sp.classList.add('has-detail');
 }
 document.addEventListener('click', function (ev) {
@@ -7910,6 +7951,7 @@ function renderGlanceVisuals() {
     svg += `<g><rect x="${sx}" y="${y(m.spend)}" width="${bw}" height="${T + plotH - y(m.spend)}" fill="var(--navy)" rx="2"/>`;
     let base = 0;
     [['won', 'var(--green)'], ['pending', 'var(--blue-tint)'], ['lost', '#b7c3d3']].forEach(([k, c]) => { const v = m[k]; if (!v) return; svg += `<rect x="${ox}" y="${y(base + v)}" width="${bw}" height="${y(base) - y(base + v)}" fill="${c}"/>`; base += v; });
+    glanceStatsMap['c1-' + i] = Object.assign({}, m, { tipTitle: m.label + (m.nat > DATA_MAX_DATE ? ' (so far)' : '') });
     glanceTipMap['c1-' + i] = glanceTipHtml(Object.assign({}, m, { tipTitle: m.label + (m.nat > DATA_MAX_DATE ? ' (so far)' : ''), tipRange: glanceFmtDY(m.s) + ' \u2013 ' + glanceFmtDY(m.e) }));
     svg += `<rect class="glance-hot" data-tip="c1-${i}" x="${L + grp * i}" y="${T}" width="${grp}" height="${plotH + 22}"/></g>`;
     svg += `<text class="glance-axislabel" x="${cx}" y="${H - 24}" text-anchor="middle" font-size="${buckets.length > 16 ? 10 : 12}">${m.label}</text>`;
